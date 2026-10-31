@@ -1,0 +1,78 @@
+# By default Metabase and a local Nominatim run in Docker. Metabase uses the
+# PostgreSQL installed on the host (reached via host.docker.internal). To run
+# PostGIS in Docker instead, start it with `docker compose --profile docker-db up -d`
+# and set METABASE_DB_HOST=db in .env.
+#
+# Nominatim imports the Berlin OpenStreetMap extract on first start (often 20–40
+# minutes) and then serves http://localhost:8080. Data stays in the nominatim-data
+# volume; deleting that volume imports again.
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    profiles: ["docker-db"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-immo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-immo}
+      POSTGRES_DB: ${POSTGRES_DB:-immo}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-immo} -d ${POSTGRES_DB:-immo}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  metabase:
+    image: metabase/metabase:latest
+    restart: unless-stopped
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_DBNAME: metabase
+      MB_DB_PORT: 5432
+      MB_DB_USER: ${POSTGRES_USER:-immo}
+      MB_DB_PASS: ${POSTGRES_PASSWORD:-immo}
+      MB_DB_HOST: ${METABASE_DB_HOST:-host.docker.internal}
+      JAVA_TIMEZONE: Europe/Berlin
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${METABASE_PORT:-3000}:3000"
+
+  nominatim:
+    image: mediagis/nominatim:5.3
+    restart: unless-stopped
+    shm_size: 1gb
+    ports:
+      - "${NOMINATIM_PORT:-8080}:8080"
+    environment:
+      PBF_URL: https://download.geofabrik.de/europe/germany/berlin-latest.osm.pbf
+      REPLICATION_URL: https://download.geofabrik.de/europe/germany/berlin-updates/
+      REPLICATION_UPDATE_INTERVAL: 86400
+      UPDATE_MODE: continuous
+      IMPORT_WIKIPEDIA: "false"
+      IMPORT_STYLE: address
+      THREADS: 4
+      GUNICORN_WORKERS: 2
+      # Defaults in the image assume a large server (10 GB maintenance memory).
+      POSTGRES_SHARED_BUFFERS: 512MB
+      POSTGRES_MAINTENANCE_WORK_MEM: 1GB
+      POSTGRES_AUTOVACUUM_WORK_MEM: 256MB
+      POSTGRES_WORK_MEM: 16MB
+      POSTGRES_EFFECTIVE_CACHE_SIZE: 2GB
+      POSTGRES_MAX_WAL_SIZE: 1GB
+    volumes:
+      - nominatim-data:/var/lib/postgresql/16/main
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 3600s
+
+volumes:
+  pgdata:
+  nominatim-data:

@@ -1,0 +1,69 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {"type": "Point", "coordinates": [13.4, 52.52]},
+      "properties": {
+        "bsn": "01G01",
+        "schulname": "Grundschule am Arkonaplatz",
+        "schulart": "Grundschule",
+        "traeger": "öffentlich",
+        "bezirk": "Mitte",
+        "ortsteil": "Mitte",
+        "plz": "10115",
+        "strasse": "Ruppiner Straße",
+        "hausnr": "47",
+        "schuljahr": "2025/26"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {"type": "Point", "coordinates": [13.405, 52.525]},
+      "properties": {
+        "bsn": "01P01",
+        "schulname": "Private Grundschule",
+        "schulart": "Grundschule",
+        "traeger": "privat",
+        "bezirk": "Mitte",
+        "ortsteil": "Mitte",
+        "plz": "10115",
+        "strasse": "Bergstraße",
+        "hausnr": "1",
+        "schuljahr": "2025/26"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {"type": "Point", "coordinates": [13.4, 52.543]},
+      "properties": {
+        "bsn": "03G01",
+        "schulname": "Grundschule am Rand",
+        "schulart": "Grundschule",
+        "traeger": "öffentlich",
+        "bezirk": "Mitte",
+        "ortsteil": "Wedding",
+        "plz": "13347",
+        "strasse": "Randstraße",
+        "hausnr": "2",
+        "schuljahr": "2025/26"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {"type": "Point", "coordinates": [13.36, 52.52]},
+      "properties": {
+        "bsn": "01B01",
+        "schulname": "OSZ Banken",
+        "schulart": "Oberstufenzentrum",
+        "traeger": "öffentlich",
+        "bezirk": "Mitte",
+        "ortsteil": "Moabit",
+        "plz": "10557",
+        "strasse": "Alt-Moabit",
+        "hausnr": "10",
+        "schuljahr": "2025/26"
+      }
+    }
+  ]
+}

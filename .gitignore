@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+data/
+logs/
+.streamlit/secrets.toml
+.DS_Store
+Thumbs.db
+desktop.ini
+.neon
+node_modules/
