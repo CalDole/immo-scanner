@@ -412,6 +412,26 @@ def match_gymnasium(name: object, stats: pd.DataFrame) -> dict[str, Any] | None:
     return plain_record(exact.sort_values("abi_average", na_position="last").iloc[0])
 
 
+def nearest_gymnasium_pass_rates(frame: pd.DataFrame, stats: pd.DataFrame) -> pd.Series:
+    """Published Abitur pass rate of each listing's nearest Gymnasium.
+
+    Names match `match_gymnasium`. A school with no published rate stays missing.
+    """
+    if (
+        "nearest_gymnasium" not in frame.columns
+        or stats.empty
+        or "abi_pass_rate_pct" not in stats.columns
+    ):
+        return pd.Series(np.nan, index=frame.index, dtype="float64")
+    lookup: dict[object, float] = {}
+    for name in pd.unique(frame["nearest_gymnasium"].dropna()):
+        match = match_gymnasium(name, stats)
+        rate = None if match is None else match.get("abi_pass_rate_pct")
+        if rate is not None:
+            lookup[name] = float(rate)
+    return frame["nearest_gymnasium"].map(lookup)
+
+
 def plain_record(row: pd.Series) -> dict[str, Any]:
     """A frame row as Python scalars, with missing values as None."""
     record: dict[str, Any] = {}

@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 from listing_detail import open_from_chart
-from listing_filters import apply_listing_filters
+from listing_filters import apply_listing_filters, hide_outdated_selected
 from listing_tooltip import CHART_FIELDS, attach_listing_hover
 
 from immo_scanner.explore.data import load_features, load_plr_hover_stats
@@ -541,9 +541,8 @@ colour_column = st.sidebar.selectbox(
 )
 
 st.sidebar.header("Filters")
-include_removed = st.sidebar.checkbox("Include removed listings", value=False)
 saved_weights = load_weights()
-df = features(active_only=not include_removed, weights=weights_version())
+df = features(active_only=hide_outdated_selected(), weights=weights_version())
 
 st.title("Scores")
 

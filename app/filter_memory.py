@@ -194,6 +194,7 @@ class FilterMemory:
         step: float,
         *,
         whole: bool,
+        help: str | None = None,
     ) -> tuple[Any, Any]:
         import streamlit as st
 
@@ -202,7 +203,8 @@ class FilterMemory:
         chosen = clamp_span(raw, low, high, step, whole=whole)
         if st.session_state.get(key) != chosen:
             st.session_state[key] = chosen
-        selected = st.sidebar.slider(label, low, high, step=step, key=key)
+        kwargs = {"help": help} if help else {}
+        selected = st.sidebar.slider(label, low, high, step=step, key=key, **kwargs)
         self.current[name] = stored_span(selected, low, high, step)
         return selected
 

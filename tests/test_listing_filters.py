@@ -1,6 +1,8 @@
 import pandas as pd
 from listing_filters import (
+    bathroom_toilet_counts,
     energy_class_options,
+    exclude_outdated,
     filter_energy_class,
     filter_rohling,
     has_commute_time,
@@ -78,3 +80,42 @@ def test_filter_rohling_keeps_the_selected_kind():
     assert filter_rohling(frame, ["not Rohling"])["title"].tolist() == ["fertig"]
     assert filter_rohling(frame, []).equals(frame)
     assert filter_rohling(frame, ["Rohling", "not Rohling"]).equals(frame)
+
+
+def test_bathroom_toilet_counts_add_a_stated_guest_toilet():
+    frame = pd.DataFrame(
+        {
+            "bathrooms": [1, 2, 1.5, None, None],
+            "has_guest_toilet": [True, False, None, True, None],
+        }
+    )
+    counts = bathroom_toilet_counts(frame)
+    assert counts.iloc[:3].tolist() == [2.0, 2.0, 1.5]
+    assert counts.iloc[3:].isna().all()
+    # A span of exactly two keeps the guest toilet and the two-bath flat.
+    kept = frame[counts.between(2, 2)]
+    assert kept.index.tolist() == [0, 1]
+
+
+def test_bathroom_toilet_counts_ignore_a_missing_guest_column():
+    frame = pd.DataFrame({"bathrooms": [1, None]})
+    counts = bathroom_toilet_counts(frame)
+    assert counts.iloc[0] == 1
+    assert pd.isna(counts.iloc[1])
+
+
+def test_bathroom_toilet_counts_are_missing_without_bathrooms():
+    frame = pd.DataFrame({"title": ["a", "b"]})
+    assert bathroom_toilet_counts(frame).isna().all()
+
+
+def test_exclude_outdated_drops_listings_gone_from_the_source():
+    frame = pd.DataFrame(
+        {
+            "id": [1, 2, 3, 4],
+            "status": ["active", "removed", "rented", None],
+        }
+    )
+    assert exclude_outdated(frame)["id"].tolist() == [1, 3, 4]
+    assert exclude_outdated(frame.drop(columns=["status"])).equals(frame.drop(columns=["status"]))
+    assert exclude_outdated(frame.iloc[0:0]).empty

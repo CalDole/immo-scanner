@@ -120,6 +120,19 @@ def _http(value: object) -> str | None:
     return None
 
 
+def detail_page_url(listing_id: object) -> str | None:
+    """Path of this app's flat page, or None when the id is missing."""
+    if isinstance(listing_id, bool) or listing_id is None:
+        return None
+    if isinstance(listing_id, float) and math.isnan(listing_id):
+        return None
+    try:
+        number = int(listing_id)
+    except (TypeError, ValueError):
+        return None
+    return f"/flat?listing={number}"
+
+
 def original_url(listing_url: object, platforms: object) -> str | None:
     """Page where the listing was published.
 

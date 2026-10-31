@@ -18,6 +18,7 @@ def range_filter(
     *,
     whole: bool = False,
     memory: FilterMemory | None = None,
+    help: str | None = None,
 ) -> pd.DataFrame:
     if column not in df.columns:
         return df
@@ -33,12 +34,45 @@ def range_filter(
     if low == high:
         return df
     if memory is None:
-        selected = st.sidebar.slider(label, low, high, (low, high), step=step_value)
+        selected = st.sidebar.slider(label, low, high, (low, high), step=step_value, help=help)
     else:
-        selected = memory.span(label, column, low, high, step_value, whole=whole)
+        selected = memory.span(label, column, low, high, step_value, whole=whole, help=help)
     if covers_full_span(selected, low, high, step_value):
         return df
     return df[df[column].between(*selected)]
+
+
+def bathroom_toilet_counts(frame: pd.DataFrame) -> pd.Series:
+    """Bathroom count, plus one when the listing states a guest toilet.
+
+    A missing bathroom count stays missing. An unstated guest toilet adds nothing.
+    """
+    if "bathrooms" not in frame.columns:
+        return pd.Series(float("nan"), index=frame.index, dtype="float64")
+    baths = pd.to_numeric(frame["bathrooms"], errors="coerce")
+    if "has_guest_toilet" not in frame.columns:
+        return baths
+    guest = frame["has_guest_toilet"].fillna(False).astype(bool).astype(float)
+    return baths + guest
+
+
+def filter_bathrooms_toilets(
+    frame: pd.DataFrame, memory: FilterMemory | None = None
+) -> pd.DataFrame:
+    """Range slider for bathrooms plus a stated guest toilet (Gäste-WC)."""
+    counts = bathroom_toilet_counts(frame)
+    if counts.dropna().empty:
+        return frame
+    tagged = frame.assign(bathrooms_toilets=counts)
+    kept = range_filter(
+        tagged,
+        "bathrooms_toilets",
+        "Bathrooms / toilets",
+        0.5,
+        memory=memory,
+        help="Bathrooms, plus one when the listing has a guest toilet (Gäste-WC).",
+    )
+    return frame.loc[kept.index]
 
 
 def normalized_energy_class(value: object) -> str | None:
@@ -156,14 +190,50 @@ def max_filter(
     return df[df[column] <= limit]
 
 
+OUTDATED_FILTER = "hide_outdated"
+OUTDATED_LABEL = "Hide outdated listings"
+OUTDATED_HELP = "Leave out listings that are no longer available on the source site."
+
+
+def exclude_outdated(frame: pd.DataFrame) -> pd.DataFrame:
+    """Drop listings the source site no longer carries (`status` removed)."""
+    if frame.empty or "status" not in frame.columns:
+        return frame
+    return frame.loc[~frame["status"].eq("removed")]
+
+
+def hide_outdated_selected(memory: FilterMemory | None = None) -> bool:
+    """Whether outdated listings should be left out, before the checkbox is drawn.
+
+    The filter is on unless this session or the saved Flats cookie turned it off.
+    Call this before loading so switching it off actually brings removed rows in.
+    """
+    import streamlit as st
+
+    key = _outdated_widget_key(memory)
+    stored = st.session_state.get(key, None)
+    if isinstance(stored, bool):
+        return stored
+    if memory is not None:
+        saved = memory.saved.get(OUTDATED_FILTER, True)
+        if isinstance(saved, bool):
+            return saved
+    return True
+
+
 def apply_listing_filters(
     df: pd.DataFrame, memory: FilterMemory | None = None
 ) -> pd.DataFrame:
     """Narrow listings with the Flats sidebar controls.
 
-    "Include removed listings" stays with the caller: it decides which rows are loaded.
+    "Hide outdated listings" is on by default. Callers that can load removed rows
+    should use ``hide_outdated_selected`` for that load, so switching the filter
+    off shows listings that are no longer on the source site.
     Pass ``memory`` on the Flats page so those controls are restored from the browser cookie.
     """
+    if _hide_outdated_checkbox(memory):
+        df = exclude_outdated(df)
+
     search = _text("Search title / address", "search", memory).strip()
     if search:
         mask = df["title"].fillna("").str.contains(search, case=False) | df["address"].fillna(
@@ -179,11 +249,80 @@ def apply_listing_filters(
     df = area_filter(df, "ortsteil", "Ortsteil", memory)
     df = area_filter(df, "prognoseraum", "Prognoseraum", memory)
     df = area_filter(df, "kiez", "Kiez", memory)
+    df = range_filter(
+        df,
+        "german_citizen_share",
+        "German citizens (%)",
+        0.5,
+        memory=memory,
+        help="Share of Planungsraum residents who are German citizens (MSS, 31.12.2024).",
+    )
+    df = range_filter(
+        df,
+        "mh_share",
+        "Migration background (%)",
+        0.5,
+        memory=memory,
+        help="Share of Planungsraum residents with a migration background (A I 16).",
+    )
+    df = range_filter(
+        df,
+        "oic_share",
+        "OIC / Islamic countries (%)",
+        0.5,
+        memory=memory,
+        help=(
+            "Share of Planungsraum residents with a migration background from "
+            "Islamic countries (OIC)."
+        ),
+    )
+    df = range_filter(
+        df,
+        "incident_rate",
+        "Berliner Register incidents",
+        0.01,
+        memory=memory,
+        help=(
+            "Street- and station-placed incidents per 1,000 residents per year, "
+            "over the last three years."
+        ),
+    )
+    df = range_filter(
+        df,
+        "school_type_level",
+        "Schultypisierung",
+        0.1,
+        memory=memory,
+        help=(
+            "Distance-weighted Schultypisierungsstufe of nearby schools. "
+            "1 is the lightest load, 7 the heaviest."
+        ),
+    )
+    df = range_filter(
+        df,
+        "nearby_school_abi_average",
+        "Abiturdurchschnitt",
+        0.05,
+        memory=memory,
+        help=(
+            "Distance-weighted Abitur average of nearby schools, on the Gymnasium scale. "
+            "1.0 is the best grade."
+        ),
+    )
+    df = range_filter(
+        df,
+        "abi_pass_rate_pct",
+        "Abitur pass rate (%)",
+        1.0,
+        memory=memory,
+        help="Published Abitur pass rate of the nearest Gymnasium.",
+    )
 
     df = range_filter(df, "price", "Price (EUR)", 10_000.0, memory=memory)
     df = range_filter(df, "price_per_m2", "Price per m² (EUR)", 100.0, memory=memory)
     df = range_filter(df, "living_area", "Living area (m²)", 1.0, memory=memory)
     df = range_filter(df, "rooms", "Rooms", 0.5, memory=memory)
+    df = filter_bathrooms_toilets(df, memory)
     df = range_filter(
         df, "building_age_years", "Building age (years)", 1.0, whole=True, memory=memory
     )
@@ -283,3 +422,18 @@ def _checkbox(
     if memory is None:
         return bool(st.sidebar.checkbox(label, value=default, **kwargs))
     return memory.checkbox(label, name, default, **kwargs)
+
+
+def _outdated_widget_key(memory: FilterMemory | None) -> str:
+    if memory is not None:
+        return f"flat_filter_{OUTDATED_FILTER}"
+    return "scores_filter_hide_outdated"
+
+
+def _hide_outdated_checkbox(memory: FilterMemory | None) -> bool:
+    if memory is not None:
+        return memory.checkbox(OUTDATED_LABEL, OUTDATED_FILTER, True, help=OUTDATED_HELP)
+    key = _outdated_widget_key(memory)
+    if key not in st.session_state:
+        st.session_state[key] = True
+    return bool(st.sidebar.checkbox(OUTDATED_LABEL, key=key, help=OUTDATED_HELP))

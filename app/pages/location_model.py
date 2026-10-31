@@ -16,7 +16,7 @@ from demographics_maps import (
     quantile_bins,
 )
 from filter_memory import FilterMemory
-from listing_filters import apply_listing_filters
+from listing_filters import apply_listing_filters, hide_outdated_selected
 
 from immo_scanner.explore.area_price import load_area_frame
 from immo_scanner.explore.data import load_features
@@ -197,8 +197,7 @@ def prediction_chart(listings: pd.DataFrame, names: pd.Series) -> alt.LayerChart
 
 st.sidebar.header("Filters")
 memory = FilterMemory.load()
-include_removed = memory.checkbox("Include removed listings", "include_removed", False)
-active_only = not include_removed
+active_only = hide_outdated_selected(memory)
 raw = loaded(active_only)
 if raw.empty:
     memory.write()

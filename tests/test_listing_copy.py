@@ -5,6 +5,7 @@ from immo_scanner.explore.listing_copy import (
     building_facts,
     commute_facts,
     description_sections,
+    detail_page_url,
     feature_checklist,
     grundschule_facts,
     gymnasium_facts,
@@ -45,6 +46,14 @@ def test_street_address_drops_the_district_suffix():
     assert street_address(raw) == "Hauptstr. 1, 10245 Berlin"
     assert street_address(None) == ""
     assert street_address(float("nan")) == ""
+
+
+def test_detail_page_url_uses_the_listing_id():
+    assert detail_page_url(42) == "/flat?listing=42"
+    assert detail_page_url("17") == "/flat?listing=17"
+    assert detail_page_url(None) is None
+    assert detail_page_url(float("nan")) is None
+    assert detail_page_url("nope") is None
 
 
 def test_original_url_prefers_a_portal_page_over_the_thinkimmo_api():

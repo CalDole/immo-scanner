@@ -221,6 +221,33 @@ def test_match_gymnasium_prefers_the_exact_name():
     assert match_gymnasium(None, stats) is None
 
 
+def test_nearest_gymnasium_pass_rates_use_the_matched_school():
+    from immo_scanner.explore.flat_detail import nearest_gymnasium_pass_rates
+
+    stats = pd.DataFrame(
+        {
+            "name": ["Max-Planck-Gymnasium", "Max-Planck-Gymnasium Mitte", "Andreas-Gymnasium"],
+            "abi_average": [2.3, 1.9, 2.1],
+            "abi_pass_rate_pct": [90.0, 70.0, 80.0],
+        }
+    )
+    frame = pd.DataFrame(
+        {
+            "nearest_gymnasium": [
+                "Max-Planck-Gymnasium",
+                "Andreas-Gymnasium Friedrichshain",
+                None,
+                "Unknown",
+            ]
+        }
+    )
+    rates = nearest_gymnasium_pass_rates(frame, stats)
+    assert rates.iloc[0] == 90.0
+    assert rates.iloc[1] == 80.0
+    assert rates.iloc[2:].isna().all()
+    assert nearest_gymnasium_pass_rates(pd.DataFrame({"title": ["a"]}), stats).isna().all()
+
+
 def test_plain_record_turns_numpy_values_into_python_ones():
     record = plain_record(pd.Series({"a": np.int64(3), "b": np.float64("nan"), "c": "x"}))
     assert record == {"a": 3, "b": None, "c": "x"}

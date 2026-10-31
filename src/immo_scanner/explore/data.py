@@ -9,6 +9,7 @@ from sqlalchemy import text
 
 from immo_scanner.db.session import get_engine
 from immo_scanner.explore.education import attach_listing_education
+from immo_scanner.explore.flat_detail import nearest_gymnasium_pass_rates
 from immo_scanner.explore.gymnasiums import attach_locations
 from immo_scanner.explore.score_weights import load_weights
 from immo_scanner.explore.scoring import INCIDENT_WINDOW_YEARS, Weights, apply_weights
@@ -55,7 +56,40 @@ def load_features(active_only: bool = True, weights: Weights | None = None) -> p
     df = apply_weights(df, weights if weights is not None else load_weights())
     if "title" in df.columns:
         df["is_rohling"] = titles_are_rohling(df["title"])
-    return attach_listing_education(df)
+    df = attach_listing_education(df)
+    return _attach_filter_columns(df)
+
+
+def _attach_filter_columns(frame: pd.DataFrame) -> pd.DataFrame:
+    """Planungsraum shares and the nearest Gymnasium's pass rate, for the sidebar filters.
+
+    `mh_share` and `nearby_school_abi_average` live with the hover stats. The pass rate
+    is the published figure for `nearest_gymnasium`.
+    """
+    if frame.empty:
+        return frame
+    out = frame
+    if "plr_id" in out.columns:
+        stats = load_plr_hover_stats()
+        extra = [
+            column
+            for column in ("mh_share", "nearby_school_abi_average")
+            if column in stats.columns and column not in out.columns
+        ]
+        if extra:
+            lookup = stats[["plr_id", *extra]].dropna(subset=["plr_id"]).drop_duplicates("plr_id")
+            out = out.merge(lookup, on="plr_id", how="left")
+            out.index = frame.index
+    if "abi_pass_rate_pct" not in out.columns and "nearest_gymnasium" in out.columns:
+        out = out.copy()
+        out["abi_pass_rate_pct"] = nearest_gymnasium_pass_rates(out, _gymnasium_pass_stats())
+    return out
+
+
+def _gymnasium_pass_stats() -> pd.DataFrame:
+    query = "SELECT name, abi_average, abi_pass_rate_pct FROM gymnasium_statistics"
+    with get_engine().connect() as conn:
+        return pd.read_sql(text(query), conn)
 
 
 def load_plr_hover_stats() -> pd.DataFrame:

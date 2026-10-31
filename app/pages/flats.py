@@ -9,7 +9,7 @@ import streamlit as st
 from demographics_maps import choropleth_layer, outline_layer
 from filter_memory import FilterMemory
 from listing_detail import open_from_map
-from listing_filters import apply_listing_filters
+from listing_filters import apply_listing_filters, hide_outdated_selected
 from listing_tooltip import MAP_TOOLTIP_HTML, attach_listing_hover
 
 from immo_scanner.explore.data import (
@@ -19,7 +19,7 @@ from immo_scanner.explore.data import (
     load_stations,
     load_workplaces,
 )
-from immo_scanner.explore.listing_copy import street_address
+from immo_scanner.explore.listing_copy import detail_page_url, original_url, street_address
 from immo_scanner.explore.prices import (
     averages_for,
     load_average_price_per_m2,
@@ -269,8 +269,7 @@ def map_legend(
 
 st.sidebar.header("Filters")
 memory = FilterMemory.load()
-include_removed = memory.checkbox("Include removed listings", "include_removed", False)
-df = features(active_only=not include_removed, weights=weights_version())
+df = features(active_only=hide_outdated_selected(memory), weights=weights_version())
 
 if df.empty:
     memory.write()
@@ -408,10 +407,15 @@ open_from_map(df, map_click.selection)
 df = df.copy()
 df["rented_label"] = rented_labels(df)
 df["avg_commute_minutes"] = avg_commute_series(df)
+df["detail"] = df["id"].map(detail_page_url) if "id" in df.columns else None
+df["original"] = (
+    df["url"].map(lambda url: original_url(url, None)) if "url" in df.columns else None
+)
 area_prices = asking_prices()
 if "plr_id" in df.columns and not area_prices.empty:
     df["avg_price_per_m2"] = averages_for(df["plr_id"], area_prices)
 table_columns = [
+    "detail", "original",
     "total_score", "price", "living_area", "building_age_years", "avg_commute_minutes",
     "address", "milieuschutz", "title",
     "available_from", "rented_label",
@@ -459,6 +463,20 @@ st.dataframe(
     use_container_width=True,
     hide_index=True,
     column_config={
+        "detail": st.column_config.LinkColumn(
+            "Details",
+            display_text="Details",
+            help="Open this flat's detail page.",
+            width=100,
+            pinned=True,
+        ),
+        "original": st.column_config.LinkColumn(
+            "Original",
+            display_text="Original",
+            help="Open the original listing.",
+            width=110,
+            pinned=True,
+        ),
         "total_score": st.column_config.NumberColumn("Score", format="%.2f"),
         "living_area": st.column_config.NumberColumn("Flat Size", format="%.0f m²"),
         "building_age_years": st.column_config.NumberColumn("Building Age", format="%.0f"),
